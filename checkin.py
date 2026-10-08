@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+import sys
 import logging
 from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union
@@ -607,12 +608,24 @@ def main():
     except Exception as e:
         logger.error(f"{LogEmoji.ERROR} 主程序执行过程中发生未预期的错误: {e}")
         title, content, log_content = "# 脚本执行出错", str(e), str(e)
+        failure_flag = True
 
     # 4. 发送推送
     logger.info(f"{LogEmoji.START} 步骤 4: 发送推送")
     push_service = PushService(config if "config" in locals() else "")
     push_service.send(title, content)
     logger.info(f"{LogEmoji.END} 签到完成")
+
+    # 如果存在签到失败，退出非零以标记 GitHub Action 失败，从而触发邮件提醒
+    failure_flag = locals().get("failure_flag", False)
+    if "checker" in locals() and hasattr(checker, "results"):
+        has_failure = failure_flag or any(
+            r.get("code") == CheckinStatus.FAILURE for r in checker.get_results()
+        )
+    else:
+        has_failure = failure_flag or True
+    if has_failure:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
